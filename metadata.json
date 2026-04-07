@@ -1,0 +1,5 @@
+{
+  "name": "Multiplica+",
+  "description": "Aplicativo pastoral completo para gestão de membros, rede de multiplicadores e acompanhamento por líderes, com relatórios automáticos e comunicação inteligente.",
+  "requestFramePermissions": ["camera"]
+}
