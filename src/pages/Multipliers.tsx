@@ -38,8 +38,7 @@ export function Multipliers() {
     role: 'multiplicador' as const,
     department: (currentUser?.role === 'pastor' || currentUser?.role === 'secretaria') 
       ? (departments[0]?.name || '') 
-      : (currentUser?.department || departments[0]?.name || ''),
-    function: 'Auxiliar'
+      : (currentUser?.department || departments[0]?.name || '')
   };
 
   const [form, setForm] = useState(defaultFormState);
@@ -51,8 +50,7 @@ export function Multipliers() {
         name: multiplier.name,
         email: multiplier.email,
         role: 'multiplicador',
-        department: multiplier.department || departments[0]?.name || '',
-        function: multiplier.function || 'Auxiliar'
+        department: multiplier.department || departments[0]?.name || ''
       });
     } else {
       setEditingId(null);
@@ -193,9 +191,6 @@ export function Multipliers() {
                   <div>
                     <h4 className="text-xl font-display font-bold text-slate-900 mb-1">{m.name}</h4>
                     <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-lg w-fit">
-                        {m.function || 'Auxiliar'}
-                      </span>
                       <span className="text-xs font-medium text-slate-400">{m.department}</span>
                     </div>
                   </div>
@@ -271,16 +266,6 @@ export function Multipliers() {
                       value={form.email}
                       onChange={e => setForm({...form, email: e.target.value})}
                       placeholder="email@exemplo.com"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary-start/5 focus:border-primary-start/30 transition-all font-medium"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Função</label>
-                    <input 
-                      type="text" 
-                      value={form.function}
-                      onChange={e => setForm({...form, function: e.target.value})}
-                      placeholder="Ex: Auxiliar de Louvor"
                       className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary-start/5 focus:border-primary-start/30 transition-all font-medium"
                     />
                   </div>

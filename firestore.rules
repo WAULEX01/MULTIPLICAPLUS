@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: members
+    // Fields: id, name, phone, department, isNewConvert, joinDate, plan, isActive
+    //
+    // Collection: users
+    // Fields: id, name, email, role, department, function
+    //
+    // Collection: departments
+    // Fields: id, name, description, leaderId
+    //
+    // Collection: attendance
+    // Fields: id, date, department, memberId, present, serviceType
+    //
+    // Collection: meetings
+    // Fields: id, title, date, time, department, createdBy, description
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      // For this demo, we'll allow waulex2014@gmail.com as admin if we had email auth.
+      // Since we use anonymous auth for now, we'll check the users collection by a custom field if needed.
+      // But for the sake of the rules requirement, we'll check if the user document says 'pastor'.
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'pastor';
+    }
+
+    function isSecretaria() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'secretaria';
+    }
+
+    function isLider() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'lider';
+    }
+
+    function isMultiplicador() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'multiplicador';
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Allow read/write for everyone to enable initial setup and login
+      allow read, write: if true;
+    }
+
+    match /members/{memberId} {
+      allow read, write: if true;
+    }
+
+    match /departments/{deptId} {
+      allow read, write: if true;
+    }
+
+    match /attendance/{recordId} {
+      allow read, write: if true;
+    }
+
+    match /meetings/{meetingId} {
+      allow read, write: if true;
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

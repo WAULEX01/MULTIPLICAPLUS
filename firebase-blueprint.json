@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "members": {
+      "title": "Member",
+      "description": "A member of the church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "birthDate": { "type": "string", "format": "date" },
+        "department": { "type": "string" },
+        "isNewConvert": { "type": "boolean" },
+        "isBaptized": { "type": "boolean" },
+        "isIntegration": { "type": "boolean" },
+        "joinDate": { "type": "string", "format": "date" },
+        "plan": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "name", "phone", "department", "birthDate"]
+    },
+    "users": {
+      "title": "User",
+      "description": "A system user (pastor, leader, etc.)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["pastor", "lider", "multiplicador", "secretaria"] },
+        "department": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "departments": {
+      "title": "Department",
+      "description": "A church department",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "leaderId": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "attendance": {
+      "title": "AttendanceRecord",
+      "description": "An attendance record for a member",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "department": { "type": "string" },
+        "memberId": { "type": "string" },
+        "present": { "type": "boolean" },
+        "serviceType": { "type": "string", "enum": ["Quinta", "Domingo", "Outro"] }
+      },
+      "required": ["id", "date", "department", "memberId", "present"]
+    },
+    "meetings": {
+      "title": "Meeting",
+      "description": "A scheduled meeting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "department": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "title", "date", "time", "department", "createdBy"]
+    }
+  },
+  "firestore": {
+    "/members/{memberId}": {
+      "schema": "members",
+      "description": "Collection of church members"
+    },
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "Collection of system users"
+    },
+    "/departments/{deptId}": {
+      "schema": "departments",
+      "description": "Collection of church departments"
+    },
+    "/attendance/{recordId}": {
+      "schema": "attendance",
+      "description": "Collection of attendance records"
+    },
+    "/meetings/{meetingId}": {
+      "schema": "meetings",
+      "description": "Collection of scheduled meetings"
+    }
+  }
+}

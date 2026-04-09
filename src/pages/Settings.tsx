@@ -1,20 +1,44 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Shield, Bell, Key, Database, User, Globe, Moon, Sun, Check, ChevronRight, LogOut, Trash2, Plus, ChevronDown } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, Bell, Key, Database, User, Globe, Moon, Sun, Check, ChevronRight, LogOut, Trash2, Plus, ChevronDown, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../context/AuthContext';
+import { useAppContext } from '../context/AppContext';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 type SettingsTab = 'geral' | 'seguranca' | 'notificacoes' | 'backup' | 'perfil';
 
 export function Settings() {
+  const { user, logout } = useAuth();
+  const { resetData, settings, updateSettings } = useAppContext();
   const [activeTab, setActiveTab] = useState<SettingsTab>('geral');
   const [isSaving, setIsSaving] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
-  const handleSave = () => {
+  const [formData, setFormData] = useState({
+    churchName: settings?.churchName || '',
+    logoUrl: settings?.logoUrl || ''
+  });
+
+  React.useEffect(() => {
+    if (settings) {
+      setFormData({
+        churchName: settings.churchName,
+        logoUrl: settings.logoUrl
+      });
+    }
+  }, [settings]);
+
+  const handleSave = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      await updateSettings(formData);
       toast.success('Configurações salvas com sucesso!');
-    }, 1000);
+    } catch (error) {
+      toast.error('Erro ao salvar configurações');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const tabs = [
@@ -106,7 +130,7 @@ export function Settings() {
                     <div className="flex flex-col sm:flex-row items-center gap-10">
                       <div className="relative group">
                         <div className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-4xl font-black shadow-2xl group-hover:scale-105 transition-transform">
-                          JD
+                          {user?.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                         </div>
                         <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-xl shadow-xl border border-slate-100 flex items-center justify-center text-blue-600 hover:scale-110 transition-transform">
                           <Plus className="w-5 h-5" />
@@ -118,7 +142,8 @@ export function Settings() {
                             <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
                             <input 
                               type="text" 
-                              defaultValue="João Daniel"
+                              readOnly
+                              value={user?.name}
                               className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all font-bold text-slate-800"
                             />
                           </div>
@@ -126,7 +151,8 @@ export function Settings() {
                             <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">E-mail</label>
                             <input 
                               type="email" 
-                              defaultValue="joao@multiplicamais.com"
+                              readOnly
+                              value={user?.email}
                               className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all font-bold text-slate-800"
                             />
                           </div>
@@ -142,14 +168,39 @@ export function Settings() {
                   <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm">
                     <h3 className="text-2xl font-black text-slate-900 mb-8 tracking-tight">Configurações Gerais</h3>
                     <div className="space-y-8">
-                      <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Nome da Igreja / Instituição</label>
-                        <input 
-                          type="text" 
-                          defaultValue="Igreja Multiplica Mais"
-                          className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all font-bold text-slate-800"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Nome da Igreja / Instituição</label>
+                          <input 
+                            type="text" 
+                            value={formData.churchName}
+                            onChange={(e) => setFormData({ ...formData, churchName: e.target.value })}
+                            className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all font-bold text-slate-800"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">URL da Logo (PNG/JPG)</label>
+                          <input 
+                            type="text" 
+                            value={formData.logoUrl}
+                            onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                            placeholder="https://exemplo.com/logo.png"
+                            className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all font-bold text-slate-800"
+                          />
+                        </div>
                       </div>
+
+                      {formData.logoUrl && (
+                        <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-center gap-6">
+                          <div className="w-20 h-20 rounded-2xl bg-white shadow-sm overflow-hidden flex items-center justify-center border border-slate-200">
+                            <img src={formData.logoUrl} alt="Preview" className="max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-slate-900">Prévia da Logo</h4>
+                            <p className="text-sm text-slate-500">Esta imagem aparecerá no topo do menu lateral.</p>
+                          </div>
+                        </div>
+                      )}
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                         <div className="space-y-2">
@@ -298,6 +349,26 @@ export function Settings() {
                         </button>
                       </div>
 
+                      {user?.role === 'pastor' && (
+                        <div className="bg-rose-50 rounded-[2rem] p-8 border border-rose-100 flex flex-col md:flex-row items-center justify-between gap-8">
+                          <div className="flex items-center gap-6">
+                            <div className="w-16 h-16 rounded-2xl bg-white text-rose-600 flex items-center justify-center shadow-xl shadow-rose-600/10">
+                              <AlertTriangle className="w-8 h-8" />
+                            </div>
+                            <div>
+                              <h4 className="text-xl font-black text-slate-900">Resetar Sistema</h4>
+                              <p className="text-sm font-bold text-slate-500">Apaga todos os membros, presenças e reuniões.</p>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => setIsResetModalOpen(true)}
+                            className="bg-rose-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-rose-600/20 hover:bg-rose-700 transition-all whitespace-nowrap"
+                          >
+                            Resetar Todos os Dados
+                          </button>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                         <div className="p-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 hover:border-blue-200 transition-all group">
                           <h4 className="text-lg font-black text-slate-900 mb-2">Exportar Dados</h4>
@@ -322,6 +393,18 @@ export function Settings() {
           </AnimatePresence>
         </div>
       </div>
+      <ConfirmModal 
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+        onConfirm={async () => {
+          await resetData();
+          setIsResetModalOpen(false);
+        }}
+        title="Resetar Todos os Dados?"
+        message="Esta ação é IRREVERSÍVEL. Todos os membros, presenças, reuniões e usuários (exceto você) serão apagados permanentemente."
+        confirmText="Sim, Resetar Tudo"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }

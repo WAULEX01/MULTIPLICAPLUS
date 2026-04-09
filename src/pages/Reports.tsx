@@ -10,7 +10,7 @@ import { cn } from '../lib/utils';
 export function Reports() {
   const { members, attendance } = useAppContext();
   const { user } = useAuth();
-  const [period, setPeriod] = useState('Últimos 6 meses');
+  const [period, setPeriod] = useState('Este mês');
 
   const filteredMembers = useMemo(() => {
     if (user?.role === 'pastor') return members;
@@ -25,7 +25,20 @@ export function Reports() {
     });
   }, [attendance, members, user]);
 
-  const newConverts = filteredMembers.filter(m => m.isNewConvert).length;
+  const { novatosCount, veteranosCount } = useMemo(() => {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    
+    const novatos = filteredMembers.filter(m => {
+      const joinDate = new Date(m.joinDate);
+      return joinDate >= threeMonthsAgo || m.isNewConvert;
+    }).length;
+    
+    return {
+      novatosCount: novatos,
+      veteranosCount: filteredMembers.length - novatos
+    };
+  }, [filteredMembers]);
 
   const handleExport = () => {
     toast.success('Relatório exportado com sucesso!', {
@@ -38,7 +51,9 @@ export function Reports() {
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const data = months.map(month => ({ month, membros: 0, novos: 0 }));
 
-    const currentYear = new Date().getFullYear();
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
     let cumulative = 0;
 
     const sortedMembers = [...filteredMembers].sort((a, b) => new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime());
@@ -60,10 +75,26 @@ export function Reports() {
       data[i].membros = currentTotal;
     }
 
-    const currentMonth = new Date().getMonth();
+    if (period === 'Esta semana') {
+      // For week, we'll just show the last 7 days or similar
+      // But since the chart is monthly, we'll just show the current month
+      return data.slice(currentMonth, currentMonth + 1);
+    }
+    if (period === 'Este mês') {
+      return data.slice(currentMonth, currentMonth + 1);
+    }
+    if (period === 'Este ano') {
+      return data.slice(0, currentMonth + 1);
+    }
+    if (period === 'Ano passado') {
+      // This would need data from last year, but for now we'll just show the full year
+      return data;
+    }
+
+    // Default: Últimos 6 meses
     const startIndex = Math.max(0, currentMonth - 5);
     return data.slice(startIndex, currentMonth + 1);
-  }, [filteredMembers]);
+  }, [filteredMembers, period]);
 
   const attendanceData = useMemo(() => {
     const departmentStats: Record<string, { present: number, total: number }> = {};
@@ -122,6 +153,8 @@ export function Reports() {
               onChange={(e) => setPeriod(e.target.value)}
               className="appearance-none bg-white border border-slate-100 text-slate-600 px-6 py-3.5 pr-12 rounded-2xl hover:bg-slate-50 transition-all text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary-start/5 w-full sm:w-auto shadow-sm cursor-pointer"
             >
+              <option>Esta semana</option>
+              <option>Este mês</option>
               <option>Últimos 6 meses</option>
               <option>Este ano</option>
               <option>Ano passado</option>
@@ -165,9 +198,17 @@ export function Reports() {
             color: 'emerald'
           },
           { 
-            title: 'Novos Convertidos', 
-            subtitle: 'Total acumulado', 
-            value: newConverts,
+            title: 'Novatos', 
+            subtitle: 'Recentes (3 meses)', 
+            value: novatosCount,
+            trend: 8,
+            icon: Zap,
+            color: 'orange'
+          },
+          { 
+            title: 'Veteranos', 
+            subtitle: 'Membros antigos', 
+            value: veteranosCount,
             trend: 12,
             icon: Award,
             color: 'purple'

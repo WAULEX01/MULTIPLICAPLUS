@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { Search, Filter, Plus, MoreVertical, X, Edit2, Phone, Calendar, Users as UsersIcon, Trash2, UserCheck, Star, Zap, Scan, Camera, ShieldCheck, RefreshCw, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Filter, Plus, MoreVertical, X, Edit2, Phone, Calendar, Users as UsersIcon, Trash2, UserCheck, Star, Zap, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Baby, Clock, UserPlus, Shield, Award } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -8,27 +8,27 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { cn } from '../lib/utils';
 import Webcam from 'react-webcam';
 import * as XLSX from 'xlsx';
+import { formatDistanceToNow, parseISO, isAfter } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export function Members() {
   const { members, users, addMember, updateMember, deleteMember, departments } = useAppContext();
   const { user } = useAuth();
   const [filterDept, setFilterDept] = useState<string>('');
+  const [filterType, setFilterType] = useState<'all' | 'new' | 'integration' | 'baptized' | 'veteran'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isBiometryModalOpen, setIsBiometryModalOpen] = useState(false);
-  const [enrollmentStatus, setEnrollmentStatus] = useState<'idle' | 'capturing' | 'success'>('idle');
-  const [capturedSamples, setCapturedSamples] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [selectedMemberForBiometry, setSelectedMemberForBiometry] = useState<any>(null);
-  
-  const webcamRef = useRef<Webcam>(null);
 
   const defaultMemberState = {
     name: '',
     phone: '',
+    birthDate: '',
     department: user?.role === 'pastor' || user?.role === 'secretaria' ? '' : (user?.department || ''),
     isNewConvert: false,
+    isBaptized: false,
+    isIntegration: false,
     joinDate: new Date().toISOString().split('T')[0],
     plan: '',
     isActive: true
@@ -65,9 +65,12 @@ export function Members() {
           const newMember = {
             name: row.Nome || row.name || '',
             phone: row.Telefone || row.phone || '',
+            birthDate: row.Nascimento || row.birthDate || '',
             department: row.Departamento || row.department || '',
             plan: row.Plano || row.plan || '',
             isActive: (row.Ativo || row.active || 'Sim').toString().toLowerCase() === 'sim' || row.active === true,
+            isBaptized: (row.Batizado || row.isBaptized || 'Não').toString().toLowerCase() === 'sim' || row.isBaptized === true,
+            isIntegration: (row.Integracao || row.isIntegration || 'Não').toString().toLowerCase() === 'sim' || row.isIntegration === true,
             isNewConvert: false,
             joinDate: new Date().toISOString().split('T')[0]
           };
@@ -93,9 +96,18 @@ export function Members() {
 
       const matchesDept = filterDept ? m.department === filterDept : true;
       const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesDept && matchesSearch;
+      
+      let matchesType = true;
+      const isNew = m.isNewConvert || (isAfter(new Date(), parseISO(m.joinDate)) && (new Date().getTime() - parseISO(m.joinDate).getTime()) < 90 * 24 * 60 * 60 * 1000);
+      
+      if (filterType === 'new') matchesType = isNew;
+      if (filterType === 'veteran') matchesType = !isNew;
+      if (filterType === 'integration') matchesType = m.isIntegration;
+      if (filterType === 'baptized') matchesType = m.isBaptized;
+
+      return matchesDept && matchesSearch && matchesType;
     });
-  }, [members, filterDept, searchQuery, user]);
+  }, [members, filterDept, filterType, searchQuery, user]);
 
   const handleOpenModal = (member?: any) => {
     if (member) {
@@ -103,8 +115,11 @@ export function Members() {
       setMemberForm({
         name: member.name,
         phone: member.phone,
+        birthDate: member.birthDate || '',
         department: member.department,
         isNewConvert: member.isNewConvert || false,
+        isBaptized: member.isBaptized || false,
+        isIntegration: member.isIntegration || false,
         joinDate: member.joinDate || new Date().toISOString().split('T')[0],
         plan: member.plan || '',
         isActive: member.isActive ?? true
@@ -116,27 +131,6 @@ export function Members() {
     setIsModalOpen(true);
   };
 
-  const handleOpenBiometryModal = (member: any) => {
-    setSelectedMemberForBiometry(member);
-    setEnrollmentStatus('idle');
-    setCapturedSamples(0);
-    setIsBiometryModalOpen(true);
-  };
-
-  const startEnrollment = () => {
-    setEnrollmentStatus('capturing');
-    // Simulate capturing 5 samples
-    let samples = 0;
-    const interval = setInterval(() => {
-      samples += 1;
-      setCapturedSamples(samples);
-      if (samples >= 5) {
-        clearInterval(interval);
-        setEnrollmentStatus('success');
-        toast.success(`Biometria cadastrada para ${selectedMemberForBiometry.name}`);
-      }
-    }, 800);
-  };
 
   const handleSaveMember = (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,6 +202,20 @@ export function Members() {
             className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary-start/5 focus:border-primary-start/30 transition-all text-sm font-medium shadow-sm"
           />
         </div>
+        <div className="relative min-w-[200px]">
+          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+          <select 
+            className="w-full pl-12 pr-10 py-3.5 bg-white border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary-start/5 focus:border-primary-start/30 transition-all appearance-none text-sm font-bold text-slate-700 shadow-sm"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as any)}
+          >
+            <option value="all">Todas as Classificações</option>
+            <option value="new">Novatos</option>
+            <option value="veteran">Veteranos</option>
+            <option value="integration">Grupo de Integração</option>
+            <option value="baptized">Batizados</option>
+          </select>
+        </div>
         <div className="relative min-w-[240px]">
           <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
           <select 
@@ -251,13 +259,6 @@ export function Members() {
                 >
                   <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                     <button 
-                      onClick={() => handleOpenBiometryModal(member)}
-                      title="Cadastrar Biometria"
-                      className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
-                    >
-                      <Scan className="w-4 h-4" />
-                    </button>
-                    <button 
                       onClick={() => handleOpenModal(member)}
                       className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors"
                     >
@@ -296,14 +297,23 @@ export function Members() {
                           <XCircle className="w-3 h-3" /> Inativo
                         </span>
                       )}
-                      {member.plan && (
-                        <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-100">
-                          {member.plan}
+                      {member.isBaptized && (
+                        <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 flex items-center gap-1">
+                          <Baby className="w-3 h-3" /> Batizado
                         </span>
                       )}
-                      {member.isNewConvert && (
+                      {member.isIntegration && (
+                        <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 flex items-center gap-1">
+                          <UserPlus className="w-3 h-3" /> Integração
+                        </span>
+                      )}
+                      {member.isNewConvert || (isAfter(new Date(), parseISO(member.joinDate)) && (new Date().getTime() - parseISO(member.joinDate).getTime()) < 90 * 24 * 60 * 60 * 1000) ? (
                         <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 flex items-center gap-1">
-                          <Zap className="w-3 h-3" /> Novo
+                          <Zap className="w-3 h-3" /> Novato
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 flex items-center gap-1">
+                          <Award className="w-3 h-3" /> Veterano
                         </span>
                       )}
                     </div>
@@ -312,6 +322,10 @@ export function Members() {
                       <div className="flex items-center justify-center gap-2">
                         <Phone className="w-4 h-4 text-slate-300" />
                         <span>{member.phone}</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <Clock className="w-4 h-4 text-slate-300" />
+                        <span>Na igreja há {formatDistanceToNow(parseISO(member.joinDate), { locale: ptBR })}</span>
                       </div>
                     </div>
                   </div>
@@ -329,115 +343,6 @@ export function Members() {
       >
         <Plus className="w-8 h-8" />
       </button>
-
-      {/* Modal Biometria (Enrollment) */}
-      <AnimatePresence>
-        {isBiometryModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsBiometryModalOpen(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden"
-            >
-              <div className="flex justify-between items-center p-8 border-b border-slate-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white">
-                    <Scan className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-display font-bold text-slate-900">Cadastro Biométrico</h3>
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{selectedMemberForBiometry?.name}</p>
-                  </div>
-                </div>
-                <button onClick={() => setIsBiometryModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              <div className="p-8 space-y-8">
-                <div className="aspect-video bg-slate-900 rounded-3xl overflow-hidden relative border-4 border-slate-50 shadow-inner">
-                  {enrollmentStatus !== 'success' ? (
-                    <Webcam
-                      ref={webcamRef}
-                      audio={false}
-                      screenshotFormat="image/jpeg"
-                      className="w-full h-full object-cover"
-                      mirrored={true}
-                      onUserMedia={() => {}}
-                      onUserMediaError={() => {}}
-                      disablePictureInPicture={true}
-                      forceScreenshotSourceSize={false}
-                      imageSmoothing={true}
-                      screenshotQuality={0.92}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-emerald-500 text-white space-y-4">
-                      <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md">
-                        <ShieldCheck className="w-12 h-12" />
-                      </div>
-                      <h4 className="text-2xl font-display font-bold">Sucesso!</h4>
-                      <p className="text-white/80 font-medium">Biometria cadastrada com sucesso.</p>
-                    </div>
-                  )}
-
-                  {enrollmentStatus === 'capturing' && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-[2px]">
-                      <div className="w-48 h-48 border-2 border-dashed border-white/50 rounded-full animate-pulse flex items-center justify-center">
-                        <div className="w-40 h-40 border-2 border-white rounded-full flex items-center justify-center">
-                          <RefreshCw className="w-10 h-10 text-white animate-spin" />
-                        </div>
-                      </div>
-                      <div className="mt-8 bg-white/10 backdrop-blur-md px-6 py-2 rounded-full border border-white/20">
-                        <p className="text-white font-bold text-sm">Capturando amostras: {capturedSamples}/5</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                    <h5 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
-                      <Camera className="w-4 h-4 text-primary-start" /> Instruções de Captura
-                    </h5>
-                    <ul className="text-sm text-slate-500 space-y-2 list-disc list-inside">
-                      <li>Certifique-se de que o ambiente esteja bem iluminado.</li>
-                      <li>Mantenha o rosto centralizado no círculo.</li>
-                      <li>Remova óculos escuros ou acessórios que cubram o rosto.</li>
-                      <li>O sistema capturará 5 amostras para maior precisão.</li>
-                    </ul>
-                  </div>
-
-                  {enrollmentStatus === 'idle' && (
-                    <button 
-                      onClick={startEnrollment}
-                      className="w-full bg-gradient-primary text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-primary-start/20 active:scale-95"
-                    >
-                      Iniciar Captura
-                    </button>
-                  )}
-                  
-                  {enrollmentStatus === 'success' && (
-                    <button 
-                      onClick={() => setIsBiometryModalOpen(false)}
-                      className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
-                    >
-                      Concluir
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Modal Adicionar/Editar Membro */}
       <AnimatePresence>
@@ -474,6 +379,16 @@ export function Members() {
                       value={memberForm.name}
                       onChange={e => setMemberForm({...memberForm, name: e.target.value})}
                       placeholder="Ex: João das Neves"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary-start/5 focus:border-primary-start/30 transition-all font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Data de Nascimento *</label>
+                    <input 
+                      type="date" 
+                      required
+                      value={memberForm.birthDate}
+                      onChange={e => setMemberForm({...memberForm, birthDate: e.target.value})}
                       className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary-start/5 focus:border-primary-start/30 transition-all font-medium"
                     />
                   </div>
@@ -531,12 +446,38 @@ export function Members() {
                   <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-2xl border border-blue-100">
                     <input 
                       type="checkbox" 
+                      id="isBaptized"
+                      checked={memberForm.isBaptized}
+                      onChange={e => setMemberForm({...memberForm, isBaptized: e.target.checked})}
+                      className="w-5 h-5 text-primary-start rounded-lg border-slate-300 focus:ring-primary-start"
+                    />
+                    <label htmlFor="isBaptized" className="text-sm font-bold text-blue-800 cursor-pointer flex items-center gap-2">
+                      <Baby className="w-4 h-4" /> Batizado nas águas?
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                    <input 
+                      type="checkbox" 
+                      id="isIntegration"
+                      checked={memberForm.isIntegration}
+                      onChange={e => setMemberForm({...memberForm, isIntegration: e.target.checked})}
+                      className="w-5 h-5 text-primary-start rounded-lg border-slate-300 focus:ring-primary-start"
+                    />
+                    <label htmlFor="isIntegration" className="text-sm font-bold text-amber-800 cursor-pointer flex items-center gap-2">
+                      <UserPlus className="w-4 h-4" /> Grupo de Integração?
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <input 
+                      type="checkbox" 
                       id="isActive"
                       checked={memberForm.isActive}
                       onChange={e => setMemberForm({...memberForm, isActive: e.target.checked})}
                       className="w-5 h-5 text-primary-start rounded-lg border-slate-300 focus:ring-primary-start"
                     />
-                    <label htmlFor="isActive" className="text-sm font-bold text-blue-800 cursor-pointer flex items-center gap-2">
+                    <label htmlFor="isActive" className="text-sm font-bold text-slate-800 cursor-pointer flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4" /> Membro Ativo?
                     </label>
                   </div>

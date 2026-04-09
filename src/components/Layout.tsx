@@ -7,6 +7,7 @@ import {
   BarChart3, 
   MessageSquare, 
   Network,
+  CalendarDays,
   Settings as SettingsIcon,
   Menu,
   Search,
@@ -25,6 +26,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { VerseBanner } from './VerseBanner';
 import { useAuth } from '../context/AuthContext';
+import { useAppContext } from '../context/AppContext';
+import { format, isAfter, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const VERSES: Record<string, { verse: string; reference: string }> = {
   '/': { verse: 'Ide por todo o mundo e pregai o evangelho a toda criatura.', reference: 'Marcos 16:15' },
@@ -34,6 +38,7 @@ const VERSES: Record<string, { verse: string; reference: string }> = {
   '/lideres': { verse: 'O que governa, faça-o com diligência.', reference: 'Romanos 12:8' },
   '/departamentos': { verse: 'Tudo, porém, seja feito com decência e ordem.', reference: '1 Coríntios 14:40' },
   '/presenca': { verse: 'Não deixemos de congregar-nos, como é costume de alguns.', reference: 'Hebreus 10:25' },
+  '/reunioes': { verse: 'Onde dois ou três estiverem reunidos em meu nome, ali estou eu.', reference: 'Mateus 18:20' },
   '/relatorios': { verse: 'Portanto, vede prudentemente como andais.', reference: 'Efésios 5:15' },
   '/mensagens': { verse: 'A palavra dita a seu tempo, quão boa é.', reference: 'Provérbios 15:23' },
   '/configuracoes': { verse: 'Tudo o que fizerem, façam de todo o coração, como para o Senhor.', reference: 'Colossenses 3:23' },
@@ -41,12 +46,13 @@ const VERSES: Record<string, { verse: string; reference: string }> = {
 
 const NAVIGATION = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['pastor', 'lider', 'multiplicador', 'secretaria'] },
-  { name: 'Membros', href: '/membros', icon: Users, roles: ['pastor', 'lider', 'secretaria'] },
+  { name: 'Membros', href: '/membros', icon: Users, roles: ['pastor', 'lider', 'multiplicador', 'secretaria'] },
   { name: 'Novos Convertidos', href: '/novos-convertidos', icon: UserPlus, roles: ['pastor', 'lider', 'secretaria'] },
   { name: 'Multiplicadores', href: '/multiplicadores', icon: Network, roles: ['pastor', 'lider', 'secretaria'] },
   { name: 'Líderes', href: '/lideres', icon: UsersRound, roles: ['pastor', 'secretaria'] },
   { name: 'Departamentos', href: '/departamentos', icon: Network, roles: ['pastor', 'secretaria'] },
   { name: 'Presença', href: '/presenca', icon: CheckSquare, roles: ['pastor', 'lider', 'multiplicador', 'secretaria'] },
+  { name: 'Reuniões', href: '/reunioes', icon: CalendarDays, roles: ['pastor', 'lider', 'multiplicador', 'secretaria'] },
   { name: 'Relatórios', href: '/relatorios', icon: BarChart3, roles: ['pastor', 'lider', 'secretaria'] },
   { name: 'Mensagens', href: '/mensagens', icon: MessageSquare, roles: ['pastor', 'lider'] },
   { name: 'Configurações', href: '/configuracoes', icon: SettingsIcon, roles: ['pastor', 'secretaria'] },
@@ -55,9 +61,18 @@ const NAVIGATION = [
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [collapsed, setCollapsed] = React.useState(false);
+  const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const { user, logout } = useAuth();
+  const { meetings, settings } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const upcomingMeetings = React.useMemo(() => {
+    if (!user) return [];
+    return meetings
+      .filter(m => (m.department === 'Geral' || m.department === user.department) && isAfter(parseISO(`${m.date}T${m.time}`), new Date()))
+      .sort((a, b) => parseISO(`${a.date}T${a.time}`).getTime() - parseISO(`${b.date}T${b.time}`).getTime());
+  }, [meetings, user]);
   const currentVerse = VERSES[location.pathname] || VERSES['/'];
 
   const filteredNavigation = NAVIGATION.filter(item => 
@@ -122,8 +137,12 @@ export function Layout() {
       >
         <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shrink-0", getRoleColor())}>
-              <Zap className="w-6 h-6 text-white" />
+            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shrink-0 overflow-hidden", !settings?.logoUrl && getRoleColor())}>
+              {settings?.logoUrl ? (
+                <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <Zap className="w-6 h-6 text-white" />
+              )}
             </div>
             {!collapsed && (
               <motion.h1 
@@ -131,7 +150,7 @@ export function Layout() {
                 animate={{ opacity: 1, x: 0 }}
                 className="text-xl font-display font-bold text-slate-900 tracking-tight whitespace-nowrap"
               >
-                Multiplica+
+                {settings?.churchName || 'Multiplica+'}
               </motion.h1>
             )}
           </div>
@@ -240,10 +259,77 @@ export function Layout() {
           </div>
 
           <div className="flex items-center gap-4 lg:gap-6">
-            <button className="relative p-2.5 text-slate-500 hover:text-primary-start hover:bg-primary-start/5 rounded-xl transition-all">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-alert rounded-full border-2 border-white"></span>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="relative p-2.5 text-slate-500 hover:text-primary-start hover:bg-primary-start/5 rounded-xl transition-all"
+              >
+                <Bell className="w-5 h-5" />
+                {upcomingMeetings.length > 0 && (
+                  <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-alert rounded-full border-2 border-white"></span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {notificationsOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setNotificationsOpen(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 z-50 overflow-hidden"
+                    >
+                      <div className="p-6 border-b border-slate-50">
+                        <h4 className="text-lg font-display font-bold text-slate-900">Notificações</h4>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto p-2">
+                        {upcomingMeetings.length > 0 ? (
+                          upcomingMeetings.map((meeting) => (
+                            <div 
+                              key={meeting.id}
+                              onClick={() => {
+                                navigate('/reunioes');
+                                setNotificationsOpen(false);
+                              }}
+                              className="p-4 hover:bg-slate-50 rounded-2xl transition-colors cursor-pointer group"
+                            >
+                              <div className="flex gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-primary-start/10 flex items-center justify-center text-primary-start shrink-0">
+                                  <CalendarDays className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-slate-900 group-hover:text-primary-start transition-colors">{meeting.title}</p>
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    {format(parseISO(meeting.date), "dd 'de' MMM", { locale: ptBR })} às {meeting.time}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="py-10 text-center">
+                            <Bell className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                            <p className="text-sm text-slate-400 font-medium">Nenhuma nova notificação</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-4 bg-slate-50 text-center">
+                        <button 
+                          onClick={() => {
+                            navigate('/reunioes');
+                            setNotificationsOpen(false);
+                          }}
+                          className="text-xs font-black text-primary-start uppercase tracking-widest hover:underline"
+                        >
+                          Ver todas as reuniões
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
             
             <button className={cn("hidden sm:flex items-center gap-2 hover:opacity-90 text-white px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all shadow-lg active:scale-95", getRoleColor())}>
               <Plus className="w-4 h-4" />
@@ -266,7 +352,7 @@ export function Layout() {
 
         <VerseBanner verse={currentVerse.verse} reference={currentVerse.reference} />
 
-        <main className="flex-1 overflow-y-auto p-6 lg:p-10 bg-surface/50 custom-scrollbar">
+        <main className="flex-1 overflow-y-auto p-6 lg:p-10 bg-bg-main/20 custom-scrollbar">
           <motion.div 
             key={location.pathname}
             initial={{ opacity: 0, y: 10 }}

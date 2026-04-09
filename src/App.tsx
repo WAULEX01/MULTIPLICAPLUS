@@ -14,6 +14,7 @@ import { Reports } from './pages/Reports';
 import { Messages } from './pages/Messages';
 import { Settings } from './pages/Settings';
 import { NewConverts } from './pages/NewConverts';
+import { Meetings } from './pages/Meetings';
 import { Departments } from './pages/Departments';
 import { Leaders } from './pages/Leaders';
 import { Login } from './pages/Login';
@@ -40,6 +41,7 @@ export default function App() {
               <Route path="lideres" element={<Leaders />} />
               <Route path="departamentos" element={<Departments />} />
               <Route path="presenca" element={<Attendance />} />
+              <Route path="reunioes" element={<Meetings />} />
               <Route path="relatorios" element={<Reports />} />
               <Route path="mensagens" element={<Messages />} />
               <Route path="configuracoes" element={<Settings />} />

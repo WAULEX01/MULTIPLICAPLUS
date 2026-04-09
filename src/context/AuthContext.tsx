@@ -1,6 +1,59 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, mockUsers } from '../data/mock';
+import { User } from '../data/mock';
 import { toast } from 'sonner';
+import { auth, db } from '../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 interface AuthContextType {
   user: User | null;
@@ -27,18 +80,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', email));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        setIsLoading(false);
+        return false;
+      }
 
-    // Simple mock login logic: password is '123456' for everyone, but '1234' for waulex2014@gmail.com
-    const foundUser = mockUsers.find(u => u.email === email);
-    const isValidPassword = (email === 'waulex2014@gmail.com' && password === '1234') || password === '123456';
-    
-    if (foundUser && isValidPassword) {
-      setUser(foundUser);
-      localStorage.setItem('multiplica_user', JSON.stringify(foundUser));
-      setIsLoading(false);
-      return true;
+      const userData = querySnapshot.docs[0].data() as User;
+      
+      // Special password for admin, 123456 for others
+      const isValidPassword = (email === 'waulex2014@gmail.com' && password === '1234') || password === '123456';
+      
+      if (isValidPassword) {
+        setUser(userData);
+        localStorage.setItem('multiplica_user', JSON.stringify(userData));
+        setIsLoading(false);
+        return true;
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error("Erro ao realizar login.");
     }
 
     setIsLoading(false);
@@ -47,13 +111,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginAsGuest = async (role: 'pastor' | 'lider' | 'multiplicador' = 'pastor') => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    let guestUser = mockUsers.find(u => u.role === role);
-    if (!guestUser) guestUser = mockUsers[0];
-
-    setUser(guestUser);
-    localStorage.setItem('multiplica_user', JSON.stringify(guestUser));
+    try {
+      const q = query(collection(db, 'users'), where('role', '==', role));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const guestUser = querySnapshot.docs[0].data() as User;
+        setUser(guestUser);
+        localStorage.setItem('multiplica_user', JSON.stringify(guestUser));
+      } else {
+        toast.error("Usuário convidado não encontrado.");
+      }
+    } catch (error) {
+      console.error("Guest login error:", error);
+    }
     setIsLoading(false);
   };
 

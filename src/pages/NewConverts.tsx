@@ -7,18 +7,18 @@ import { cn } from '../lib/utils';
 
 export function NewConverts() {
   const { members } = useAppContext();
-  const newConverts = members.filter(m => m.isNewConvert);
+  const newConverts = members.filter(m => m.isNewConvert || m.isIntegration);
   const navigate = useNavigate();
 
-  // Mock status for integration timeline
-  const getStatusInfo = (index: number) => {
-    const statuses = [
-      { label: 'Consolidando', color: 'blue', icon: Clock, progress: 30 },
-      { label: 'Discipulado', color: 'purple', icon: BookOpen, progress: 60 },
-      { label: 'Batizado', color: 'emerald', icon: Waves, progress: 100 },
-      { label: 'Integrado', color: 'amber', icon: UserCheck, progress: 85 }
-    ];
-    return statuses[index % statuses.length];
+  // Updated status logic based on user requirements
+  const getStatusInfo = (member: any) => {
+    if (member.isBaptized) {
+      return { label: 'Batizado', color: 'emerald', icon: Waves, progress: 100 };
+    }
+    if (member.isIntegration) {
+      return { label: 'Em Integração', color: 'amber', icon: UserPlus, progress: 50 };
+    }
+    return { label: 'Novo Membro', color: 'blue', icon: Clock, progress: 25 };
   };
 
   return (
@@ -59,7 +59,7 @@ export function NewConverts() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
         <AnimatePresence>
           {newConverts.map((member, index) => {
-            const status = getStatusInfo(index);
+            const status = getStatusInfo(member);
             const StatusIcon = status.icon;
 
             return (
@@ -132,7 +132,7 @@ export function NewConverts() {
                   </div>
                   <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
                     <span>Início</span>
-                    <span>Consolidação</span>
+                    <span>Integração</span>
                     <span>Batismo</span>
                   </div>
                 </div>

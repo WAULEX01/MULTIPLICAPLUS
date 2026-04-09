@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAppContext } from '../context/AppContext';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
 import { Mail, Lock, LogIn, Loader2, Shield, Users, Zap } from 'lucide-react';
@@ -11,6 +12,7 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login, loginAsGuest } = useAuth();
+  const { settings } = useAppContext();
   const navigate = useNavigate();
 
   const handleGuestLogin = async (role: 'pastor' | 'lider' | 'multiplicador' = 'pastor') => {
@@ -46,17 +48,23 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-surface flex items-center justify-center p-4">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-primary text-white shadow-xl shadow-primary-start/20 mb-4">
-            <Zap className="w-8 h-8" />
+          <div className={cn("inline-flex items-center justify-center w-20 h-20 rounded-2xl shadow-xl mb-4 overflow-hidden", !settings?.logoUrl && "bg-gradient-primary text-white shadow-primary-start/20")}>
+            {settings?.logoUrl ? (
+              <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <Zap className="w-10 h-10" />
+            )}
           </div>
-          <h1 className="text-3xl font-display font-bold text-slate-900 tracking-tight">Multiplica+</h1>
+          <h1 className="text-3xl font-display font-bold text-slate-900 tracking-tight">
+            {settings?.churchName || 'Multiplica+'}
+          </h1>
           <p className="text-slate-500 mt-2">Gestão inteligente para sua rede de multiplicação</p>
         </div>
 

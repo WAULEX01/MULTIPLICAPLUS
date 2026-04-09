@@ -1,19 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Calendar as CalendarIcon, Users, Check, X, ChevronLeft, ChevronRight, Save, PieChart, UserCheck, UserMinus, Camera, Scan, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, Check, X, ChevronLeft, ChevronRight, Save, PieChart, UserCheck, UserMinus, AlertCircle, Award, Zap, Shield } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import Webcam from 'react-webcam';
-import { FaceDetection, Results } from '@mediapipe/face_detection';
-import { Camera as MediaPipeCamera } from '@mediapipe/camera_utils';
-
-type AttendanceMode = 'manual' | 'facial';
 
 export function Attendance() {
-  const { members, attendance: globalAttendance, saveAttendance, departments } = useAppContext();
+  const { members, users, attendance: globalAttendance, saveAttendance, departments } = useAppContext();
   const { user } = useAuth();
 
   const availableDepartments = useMemo(() => {
@@ -26,16 +21,33 @@ export function Attendance() {
   const [serviceType, setServiceType] = useState<'Quinta' | 'Domingo' | 'Outro'>('Domingo');
   const [customService, setCustomService] = useState('');
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
-  const [mode, setMode] = useState<AttendanceMode>('manual');
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanningStatus, setScanningStatus] = useState<'idle' | 'detecting' | 'recognized' | 'error'>('idle');
-  const [lastRecognized, setLastRecognized] = useState<string | null>(null);
 
-  const webcamRef = useRef<Webcam>(null);
-  const faceDetectionRef = useRef<FaceDetection | null>(null);
-  const cameraRef = useRef<MediaPipeCamera | null>(null);
+  const deptMembers = useMemo(() => {
+    const departmentMembers = members.filter(m => m.department === selectedDept && m.isActive);
+    const departmentUsers = users.filter(u => u.department === selectedDept && (u.role === 'lider' || u.role === 'multiplicador'));
+    
+    const mappedUsers = departmentUsers.map(u => ({
+      id: u.id,
+      name: u.name,
+      role: u.role === 'lider' ? 'Líder' : 'Multiplicador',
+      isUser: true
+    }));
 
-  const deptMembers = members.filter(m => m.department === selectedDept && m.isActive);
+    const mappedMembers = departmentMembers.map(m => ({
+      id: m.id,
+      name: m.name,
+      role: 'Membro',
+      isUser: false
+    }));
+
+    return [...mappedUsers, ...mappedMembers].sort((a, b) => {
+      const roleOrder: Record<string, number> = { 'Líder': 0, 'Multiplicador': 1, 'Membro': 2 };
+      if (roleOrder[a.role] !== roleOrder[b.role]) {
+        return roleOrder[a.role] - roleOrder[b.role];
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [members, users, selectedDept]);
   
   // Load existing attendance when department, date or serviceType changes
   useEffect(() => {
@@ -93,78 +105,6 @@ export function Attendance() {
     });
   };
 
-  // Facial Recognition Logic (Simulated for Prototype)
-  const onResults = useCallback((results: Results) => {
-    if (results.detections.length > 0) {
-      setScanningStatus('detecting');
-      
-      // In a real app, here we would:
-      // 1. Extract the face image from the canvas
-      // 2. Generate an embedding using a model (e.g., FaceNet)
-      // 3. Compare with stored embeddings of deptMembers
-      
-      // For this prototype, we'll simulate a recognition every few seconds
-      // if a face is detected and not already recognized in this session
-      const randomMember = deptMembers[Math.floor(Math.random() * deptMembers.length)];
-      
-      if (randomMember && !attendance[randomMember.id]) {
-        // Simulate a delay for "processing"
-        setTimeout(() => {
-          setAttendance(prev => ({ ...prev, [randomMember.id]: true }));
-          setLastRecognized(randomMember.name);
-          setScanningStatus('recognized');
-          toast.success(`Reconhecido: ${randomMember.name}`, {
-            icon: <Scan className="w-4 h-4 text-emerald-500" />
-          });
-          
-          // Reset status after a while
-          setTimeout(() => {
-            setScanningStatus('detecting');
-            setLastRecognized(null);
-          }, 2000);
-        }, 1000);
-      }
-    } else {
-      setScanningStatus('idle');
-    }
-  }, [deptMembers, attendance]);
-
-  useEffect(() => {
-    if (mode === 'facial' && isScanning) {
-      faceDetectionRef.current = new FaceDetection({
-        locateFile: (file) => {
-          return `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`;
-        }
-      });
-
-      faceDetectionRef.current.setOptions({
-        model: 'short',
-        minDetectionConfidence: 0.5
-      });
-
-      faceDetectionRef.current.onResults(onResults);
-
-      if (webcamRef.current?.video) {
-        cameraRef.current = new MediaPipeCamera(webcamRef.current.video, {
-          onFrame: async () => {
-            if (webcamRef.current?.video) {
-              await faceDetectionRef.current?.send({ image: webcamRef.current.video });
-            }
-          },
-          width: 640,
-          height: 480
-        });
-        cameraRef.current.start();
-      }
-    } else {
-      cameraRef.current?.stop();
-    }
-
-    return () => {
-      cameraRef.current?.stop();
-    };
-  }, [mode, isScanning, onResults]);
-
   return (
     <div className="space-y-8 pb-20">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -173,28 +113,6 @@ export function Attendance() {
           <p className="text-slate-500 mt-1">Marque quem esteve presente no encontro de hoje.</p>
         </div>
         <div className="flex items-center gap-4">
-          {/* Mode Toggle */}
-          <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner">
-            <button
-              onClick={() => setMode('manual')}
-              className={cn(
-                "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2",
-                mode === 'manual' ? "bg-white text-primary-start shadow-sm" : "text-slate-400 hover:text-slate-600"
-              )}
-            >
-              <Users className="w-4 h-4" /> Manual
-            </button>
-            <button
-              onClick={() => setMode('facial')}
-              className={cn(
-                "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2",
-                mode === 'facial' ? "bg-white text-primary-start shadow-sm" : "text-slate-400 hover:text-slate-600"
-              )}
-            >
-              <Scan className="w-4 h-4" /> Facial
-            </button>
-          </div>
-
           <div className="hidden md:flex flex-col items-end">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Frequência do Dia</span>
             <span className="text-2xl font-display font-bold text-primary-start">{percentage}%</span>
@@ -331,273 +249,125 @@ export function Attendance() {
           </motion.div>
         </div>
 
-        {/* Members List / Facial Recognition */}
+        {/* Members List */}
         <div className="lg:col-span-2">
-          <AnimatePresence mode="wait">
-            {mode === 'manual' ? (
-              <motion.div 
-                key="manual-list"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden"
-              >
-                <div className="p-8 border-b border-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/30">
-                  <div>
-                    <h3 className="text-xl font-display font-bold text-slate-900">Lista de Chamada</h3>
-                    <p className="text-xs text-slate-500 font-medium">{deptMembers.length} Membros ativos</p>
-                  </div>
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <button 
-                      onClick={() => markAll(true)}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all border border-emerald-100"
-                    >
-                      Marcar todos presentes
-                    </button>
-                    <button 
-                      onClick={() => markAll(false)}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition-all border border-rose-100"
-                    >
-                      Marcar todos faltaram
-                    </button>
-                  </div>
-                </div>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden"
+          >
+            <div className="p-8 border-b border-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/30">
+              <div>
+                <h3 className="text-xl font-display font-bold text-slate-900">Lista de Chamada</h3>
+                <p className="text-xs text-slate-500 font-medium">{deptMembers.length} Integrantes ativos</p>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <button 
+                  onClick={() => markAll(true)}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all border border-emerald-100"
+                >
+                  Marcar todos presentes
+                </button>
+                <button 
+                  onClick={() => markAll(false)}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition-all border border-rose-100"
+                >
+                  Marcar todos faltaram
+                </button>
+              </div>
+            </div>
 
-                <div className="divide-y divide-slate-50">
-                  <AnimatePresence mode="popLayout">
-                    {deptMembers.map((member, index) => {
-                      const isPresent = attendance[member.id] === true;
-                      const isAbsent = attendance[member.id] === false;
+            <div className="divide-y divide-slate-50">
+              <AnimatePresence mode="popLayout">
+                {deptMembers.map((member, index) => {
+                  const isPresent = attendance[member.id] === true;
+                  const isAbsent = attendance[member.id] === false;
 
-                      return (
-                        <motion.div 
-                          key={member.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className="p-6 flex items-center justify-between group hover:bg-slate-50/50 transition-all"
+                  return (
+                    <motion.div 
+                      key={member.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="p-6 flex items-center justify-between group hover:bg-slate-50/50 transition-all"
+                    >
+                      <div className="flex items-center gap-5">
+                        <div className={cn(
+                          "w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-display font-bold transition-all shadow-inner",
+                          isPresent ? "bg-emerald-50 text-emerald-600 border-2 border-emerald-100" :
+                          isAbsent ? "bg-rose-50 text-rose-600 border-2 border-rose-100" :
+                          "bg-slate-50 text-slate-400 border-2 border-slate-100"
+                        )}>
+                          {member.name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-slate-900 text-lg">{member.name}</p>
+                            {member.role === 'Líder' && <Shield className="w-4 h-4 text-amber-500" />}
+                            {member.role === 'Multiplicador' && <Zap className="w-4 h-4 text-primary-start" />}
+                          </div>
+                          <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">{member.role}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => toggleAttendance(member.id, true)}
+                          className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-90",
+                            isPresent 
+                              ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" 
+                              : "bg-slate-50 text-slate-300 hover:bg-emerald-50 hover:text-emerald-400"
+                          )}
                         >
-                          <div className="flex items-center gap-5">
-                            <div className={cn(
-                              "w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-display font-bold transition-all shadow-inner",
-                              isPresent ? "bg-emerald-50 text-emerald-600 border-2 border-emerald-100" :
-                              isAbsent ? "bg-rose-50 text-rose-600 border-2 border-rose-100" :
-                              "bg-slate-50 text-slate-400 border-2 border-slate-100"
-                            )}>
-                              {member.name.charAt(0)}
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-900 text-lg">{member.name}</p>
-                              <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">{member.role}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <button 
-                              onClick={() => toggleAttendance(member.id, true)}
-                              className={cn(
-                                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-90",
-                                isPresent 
-                                  ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" 
-                                  : "bg-slate-50 text-slate-300 hover:bg-emerald-50 hover:text-emerald-400"
-                              )}
-                            >
-                              <Check className={cn("w-6 h-6 transition-transform", isPresent && "scale-110")} />
-                            </button>
-                            <button 
-                              onClick={() => toggleAttendance(member.id, false)}
-                              className={cn(
-                                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-90",
-                                isAbsent 
-                                  ? "bg-rose-500 text-white shadow-lg shadow-rose-500/30" 
-                                  : "bg-slate-50 text-slate-300 hover:bg-rose-50 hover:text-rose-400"
-                              )}
-                            >
-                              <X className={cn("w-6 h-6 transition-transform", isAbsent && "scale-110")} />
-                            </button>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                  
-                  {deptMembers.length === 0 && (
-                    <div className="p-20 text-center">
-                      <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Users className="w-10 h-10 text-slate-200" />
+                          <Check className={cn("w-6 h-6 transition-transform", isPresent && "scale-110")} />
+                        </button>
+                        <button 
+                          onClick={() => toggleAttendance(member.id, false)}
+                          className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-90",
+                            isAbsent 
+                              ? "bg-rose-500 text-white shadow-lg shadow-rose-500/30" 
+                              : "bg-slate-50 text-slate-300 hover:bg-rose-50 hover:text-rose-400"
+                          )}
+                        >
+                          <X className={cn("w-6 h-6 transition-transform", isAbsent && "scale-110")} />
+                        </button>
                       </div>
-                      <h4 className="text-lg font-bold text-slate-800 mb-2">Nenhum membro encontrado</h4>
-                      <p className="text-slate-400 max-w-xs mx-auto">Selecione outro departamento ou adicione membros para começar a chamada.</p>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div 
-                key="facial-recognition"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[600px]"
-              >
-                <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary-start rounded-xl flex items-center justify-center text-white">
-                      <Scan className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-display font-bold text-slate-900">Chamada Facial</h3>
-                      <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Tecnologia de Visão Computacional</p>
-                    </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+              
+              {deptMembers.length === 0 && (
+                <div className="p-20 text-center">
+                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Users className="w-10 h-10 text-slate-200" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "w-3 h-3 rounded-full animate-pulse",
-                      isScanning ? "bg-emerald-500" : "bg-slate-300"
-                    )} />
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                      {isScanning ? 'Sistema Ativo' : 'Sistema Pausado'}
-                    </span>
-                  </div>
+                  <h4 className="text-lg font-bold text-slate-800 mb-2">Nenhum integrante encontrado</h4>
+                  <p className="text-slate-400 max-w-xs mx-auto">Selecione outro departamento ou adicione membros para começar a chamada.</p>
                 </div>
-
-                <div className="flex-1 relative bg-slate-900 overflow-hidden">
-                  {isScanning ? (
-                    <div className="w-full h-full relative">
-                      <Webcam
-                        ref={webcamRef}
-                        audio={false}
-                        screenshotFormat="image/jpeg"
-                        className="w-full h-full object-cover opacity-80"
-                        videoConstraints={{
-                          width: 1280,
-                          height: 720,
-                          facingMode: "user"
-                        }}
-                        mirrored={false}
-                        screenshotQuality={0.92}
-                        imageSmoothing={true}
-                        forceScreenshotSourceSize={false}
-                        disablePictureInPicture={true}
-                        onUserMedia={() => {}}
-                        onUserMediaError={() => {}}
-                      />
-                      
-                      {/* Scanning Overlay */}
-                      <div className="absolute inset-0 pointer-events-none">
-                        {/* Corners */}
-                        <div className="absolute top-10 left-10 w-20 h-20 border-t-4 border-l-4 border-primary-start rounded-tl-3xl" />
-                        <div className="absolute top-10 right-10 w-20 h-20 border-t-4 border-r-4 border-primary-start rounded-tr-3xl" />
-                        <div className="absolute bottom-10 left-10 w-20 h-20 border-b-4 border-l-4 border-primary-start rounded-bl-3xl" />
-                        <div className="absolute bottom-10 right-10 w-20 h-20 border-b-4 border-r-4 border-primary-start rounded-br-3xl" />
-                        
-                        {/* Scanning Line */}
-                        <motion.div 
-                          animate={{ top: ['10%', '90%', '10%'] }}
-                          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                          className="absolute left-10 right-10 h-1 bg-gradient-to-r from-transparent via-primary-start to-transparent shadow-[0_0_15px_rgba(124,58,237,0.5)] z-20"
-                        />
-
-                        {/* Status Message */}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-                          <AnimatePresence mode="wait">
-                            {scanningStatus === 'detecting' && (
-                              <motion.div 
-                                key="detecting"
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                className="bg-primary-start/20 backdrop-blur-md border border-white/20 px-6 py-3 rounded-full flex items-center gap-3 text-white"
-                              >
-                                <RefreshCw className="w-5 h-5 animate-spin" />
-                                <span className="font-bold text-sm tracking-wide">Analisando Rosto...</span>
-                              </motion.div>
-                            )}
-                            {scanningStatus === 'recognized' && (
-                              <motion.div 
-                                key="recognized"
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                className="bg-emerald-500/80 backdrop-blur-md border border-white/20 px-8 py-4 rounded-3xl flex flex-col items-center gap-2 text-white shadow-2xl"
-                              >
-                                <ShieldCheck className="w-10 h-10" />
-                                <span className="font-black text-lg tracking-tight">{lastRecognized}</span>
-                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">Presença Confirmada</span>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-white p-12 text-center space-y-6">
-                      <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10">
-                        <Camera className="w-12 h-12 text-white/40" />
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="text-2xl font-display font-bold">Câmera Desativada</h4>
-                        <p className="text-white/60 max-w-xs mx-auto">Ative a câmera para iniciar o reconhecimento facial automático dos membros.</p>
-                      </div>
-                      <button 
-                        onClick={() => setIsScanning(true)}
-                        className="bg-white text-slate-900 px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-100 transition-all shadow-xl active:scale-95"
-                      >
-                        Ativar Reconhecimento
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-8 bg-slate-50 flex justify-between items-center">
-                  <div className="flex items-center gap-4">
-                    <div className="flex -space-x-3">
-                      {deptMembers.slice(0, 5).map((m, i) => (
-                        <div key={m.id} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-500 shadow-sm">
-                          {m.name.charAt(0)}
-                        </div>
-                      ))}
-                      {deptMembers.length > 5 && (
-                        <div className="w-10 h-10 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 shadow-sm">
-                          +{deptMembers.length - 5}
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                      {presentCount} de {totalCount} presentes
-                    </p>
-                  </div>
-                  
-                  {isScanning && (
-                    <button 
-                      onClick={() => setIsScanning(false)}
-                      className="text-rose-500 font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-rose-50 px-4 py-2 rounded-xl transition-all"
-                    >
-                      <X className="w-4 h-4" /> Parar Scanner
-                    </button>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              )}
+            </div>
+          </motion.div>
         </div>
       </div>
 
-      {/* Security/Privacy Info (Stage 11) */}
+      {/* Security/Privacy Info */}
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className="bg-amber-50 border border-amber-100 rounded-3xl p-6 flex items-start gap-4"
+        className="bg-blue-50 border border-blue-100 rounded-3xl p-6 flex items-start gap-4"
       >
-        <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 shrink-0">
+        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
           <AlertCircle className="w-6 h-6" />
         </div>
         <div>
-          <h5 className="font-bold text-amber-900">Privacidade e Segurança (LGPD)</h5>
-          <p className="text-sm text-amber-800/70 mt-1 leading-relaxed">
-            Este sistema utiliza <strong>embeddings biométricos</strong> processados localmente. Nenhuma foto é armazenada permanentemente. 
-            O reconhecimento facial é realizado on-device para garantir a privacidade dos membros conforme as diretrizes da LGPD.
+          <h5 className="font-bold text-blue-900">Registro de Presença</h5>
+          <p className="text-sm text-blue-800/70 mt-1 leading-relaxed">
+            A lista de presença inclui a liderança, os multiplicadores e todos os membros do departamento. 
+            Certifique-se de registrar a presença de todos os integrantes para manter os relatórios atualizados.
           </p>
         </div>
       </motion.div>

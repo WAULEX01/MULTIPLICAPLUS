@@ -16,7 +16,8 @@ import {
   UsersRound,
   AlertTriangle,
   Phone,
-  Home
+  Home,
+  Award
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -74,7 +75,21 @@ export function Dashboard() {
   const totalMembers = filteredMembers.length;
   const totalDepartments = (user?.role === 'pastor' || user?.role === 'secretaria') ? departments.length : 1;
   const totalLeaders = (user?.role === 'pastor' || user?.role === 'secretaria') ? users.filter(u => u.role === 'lider').length : (user?.role === 'lider' ? 1 : 0);
-  const newConverts = filteredMembers.filter(m => m.isNewConvert).length;
+  
+  const { novatosCount, veteranosCount } = useMemo(() => {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    
+    const novatos = filteredMembers.filter(m => {
+      const joinDate = new Date(m.joinDate);
+      return joinDate >= threeMonthsAgo || m.isNewConvert;
+    }).length;
+    
+    return {
+      novatosCount: novatos,
+      veteranosCount: totalMembers - novatos
+    };
+  }, [filteredMembers, totalMembers]);
 
   const attendanceData = useMemo(() => {
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -170,10 +185,13 @@ export function Dashboard() {
 
   const getWelcomeMessage = () => {
     if (!user) return 'E aí!';
-    if (user.role === 'pastor') return `E aí, Pastor ${user.name.split(' ')[1]}! 👋`;
-    if (user.role === 'lider') return `E aí, Líder ${user.name.split(' ')[1]}! 👋`;
-    if (user.role === 'secretaria') return `E aí, ${user.name.split(' ')[0]}! 👋`;
-    return `E aí, Multiplicador ${user.name.split(' ')[1]}! 👋`;
+    const firstName = user.name.split(' ')[0];
+    const lastName = user.name.split(' ').length > 1 ? user.name.split(' ')[1] : '';
+    
+    if (user.role === 'pastor') return `E aí, Pastor ${lastName || firstName}! 👋`;
+    if (user.role === 'lider') return `E aí, Líder ${lastName || firstName}! 👋`;
+    if (user.role === 'secretaria') return `E aí, ${firstName}! 👋`;
+    return `E aí, Multiplicador ${lastName || firstName}! 👋`;
   };
 
   const getWelcomeSub = () => {
@@ -208,12 +226,20 @@ export function Dashboard() {
       bg: 'bg-emerald-50'
     },
     { 
-      label: 'Novos Convertidos', 
-      value: newConverts, 
+      label: 'Novatos', 
+      value: novatosCount, 
       icon: Zap, 
       color: 'from-orange-500 to-orange-600', 
-      trend: '+8',
+      trend: 'Recentes',
       bg: 'bg-orange-50'
+    },
+    { 
+      label: 'Veteranos', 
+      value: veteranosCount, 
+      icon: Award, 
+      color: 'from-blue-500 to-blue-600', 
+      trend: 'Antigos',
+      bg: 'bg-blue-50'
     },
   ];
 
