@@ -223,7 +223,7 @@ export function Messages() {
             <div className="space-y-3">
               {[
                 { id: 'all', label: 'Todos os Membros', sub: 'Toda a igreja', icon: Users, color: 'blue' },
-                { id: 'leaders', label: 'Liderança', sub: 'Líderes e Auxiliares', icon: Shield, color: 'emerald' },
+                { id: 'leaders', label: 'Liderança', sub: 'Líderes e Multiplicadores', icon: Shield, color: 'emerald' },
                 { id: 'absent', label: 'Ausentes', sub: 'Faltaram recentemente', icon: AlertCircle, color: 'rose' },
                 { id: 'departments', label: 'Por Departamentos', sub: 'Escolha os depts', icon: Users, color: 'orange' },
               ].map((opt) => (

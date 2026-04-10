@@ -4,63 +4,7 @@ import {
   AttendanceRecord, DEPARTMENTS as INITIAL_DEPARTMENTS, Department,
   Meeting, mockMeetings, AppSettings, mockSettings
 } from '../data/mock';
-import { auth, db } from '../firebase';
-import { 
-  collection, onSnapshot, doc, setDoc, deleteDoc, 
-  writeBatch, getDocs, query, where 
-} from 'firebase/firestore';
 import { toast } from 'sonner';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
 
 interface AppContextType {
   members: Member[];
@@ -96,161 +40,160 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
 
   useEffect(() => {
-    let isMigrating = {
-      members: false,
-      users: false,
-      departments: false,
-      meetings: false,
-      settings: false
+    const fetchData = async () => {
+      const token = localStorage.getItem('multiplica_token');
+      if (!token) return;
+
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      try {
+        const [membersRes, usersRes, attendanceRes, settingsRes] = await Promise.all([
+          fetch('/api/members', { headers }),
+          fetch('/api/users', { headers }),
+          fetch('/api/attendance', { headers }),
+          fetch('/api/settings')
+        ]);
+
+        if (membersRes.ok) {
+          const rawMembers = await membersRes.json();
+          setMembers(rawMembers.map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            email: m.email,
+            phone: m.phone,
+            department: m.department,
+            joinDate: m.join_date,
+            birthDate: m.birth_date,
+            isBaptized: !!m.is_baptized,
+            isNewConvert: !!m.is_new_convert,
+            isActive: !!m.is_active
+          })));
+        }
+        if (usersRes.ok) setUsers(await usersRes.json());
+        if (attendanceRes.ok) {
+          const rawAttendance = await attendanceRes.json();
+          setAttendance(rawAttendance.map((a: any) => ({
+            id: a.id,
+            date: a.date,
+            department: a.department,
+            memberId: a.member_id,
+            present: !!a.present,
+            serviceType: a.service_type
+          })));
+        }
+        if (settingsRes.ok) setSettings(await settingsRes.json());
+        
+        // Departments and Meetings would be similar
+        setDepartments(INITIAL_DEPARTMENTS);
+        setMeetings(mockMeetings);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
     };
 
-    const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Member));
-      if (data.length === 0 && !isMigrating.members) {
-        isMigrating.members = true;
-        console.log("Migrating members...");
-        mockMembers.forEach(m => setDoc(doc(db, 'members', m.id), m).catch(e => console.error("Error migrating member:", e)));
-      } else {
-        setMembers(data);
-      }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'members'));
-
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User));
-      if (data.length === 0 && !isMigrating.users) {
-        isMigrating.users = true;
-        console.log("Migrating users...");
-        mockUsers.forEach(u => setDoc(doc(db, 'users', u.id), u).catch(e => console.error("Error migrating user:", e)));
-      } else {
-        setUsers(data);
-      }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'users'));
-
-    const unsubDepts = onSnapshot(collection(db, 'departments'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Department));
-      if (data.length === 0 && !isMigrating.departments) {
-        isMigrating.departments = true;
-        console.log("Migrating departments...");
-        INITIAL_DEPARTMENTS.forEach(d => setDoc(doc(db, 'departments', d.id), d).catch(e => console.error("Error migrating department:", e)));
-      } else {
-        setDepartments(data);
-      }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'departments'));
-
-    const unsubAttendance = onSnapshot(collection(db, 'attendance'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AttendanceRecord));
-      setAttendance(data);
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'attendance'));
-
-    const unsubMeetings = onSnapshot(collection(db, 'meetings'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Meeting));
-      if (data.length === 0 && !isMigrating.meetings) {
-        isMigrating.meetings = true;
-        console.log("Migrating meetings...");
-        mockMeetings.forEach(m => setDoc(doc(db, 'meetings', m.id), m).catch(e => console.error("Error migrating meeting:", e)));
-      } else {
-        setMeetings(data);
-      }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'meetings'));
-
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
-      if (snapshot.exists()) {
-        setSettings({ ...snapshot.data(), id: snapshot.id } as AppSettings);
-      } else if (!isMigrating.settings) {
-        isMigrating.settings = true;
-        console.log("Migrating settings...");
-        setDoc(doc(db, 'settings', 'global'), mockSettings).catch(e => console.error("Error migrating settings:", e));
-      }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'settings'));
-
-    return () => {
-      unsubMembers();
-      unsubUsers();
-      unsubDepts();
-      unsubAttendance();
-      unsubMeetings();
-      unsubSettings();
-    };
+    fetchData();
   }, []);
+
+  const apiFetch = async (url: string, options: any = {}) => {
+    const token = localStorage.getItem('multiplica_token');
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...options.headers
+    };
+    const response = await fetch(url, { ...options, headers });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Erro na requisição');
+    }
+    return response.json();
+  };
 
   const addMember = async (memberData: Omit<Member, 'id'>) => {
     const id = `m${Date.now()}`;
-    await setDoc(doc(db, 'members', id), { ...memberData, id });
+    const newMember = { ...memberData, id };
+    await apiFetch('/api/members', {
+      method: 'POST',
+      body: JSON.stringify(newMember)
+    });
+    setMembers(prev => [...prev, newMember]);
   };
 
   const updateMember = async (id: string, memberData: Partial<Member>) => {
-    await setDoc(doc(db, 'members', id), memberData, { merge: true });
+    await apiFetch(`/api/members/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(memberData)
+    });
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, ...memberData } : m));
   };
 
   const deleteMember = async (id: string) => {
-    await deleteDoc(doc(db, 'members', id));
+    await apiFetch(`/api/members/${id}`, {
+      method: 'DELETE'
+    });
+    setMembers(prev => prev.filter(m => m.id !== id));
   };
 
   const addUser = async (userData: Omit<User, 'id'>) => {
-    const id = `u${Date.now()}`;
-    await setDoc(doc(db, 'users', id), { ...userData, id });
+    // Implementation for users API
+    toast.info('Funcionalidade de adicionar usuário em desenvolvimento para SQL');
   };
 
   const updateUser = async (id: string, userData: Partial<User>) => {
-    await setDoc(doc(db, 'users', id), userData, { merge: true });
+    // Implementation for users API
+    toast.info('Funcionalidade de atualizar usuário em desenvolvimento para SQL');
   };
 
   const deleteUser = async (id: string) => {
-    await deleteDoc(doc(db, 'users', id));
+    // Implementation for users API
+    toast.info('Funcionalidade de excluir usuário em desenvolvimento para SQL');
   };
 
   const addDepartment = async (deptData: Omit<Department, 'id'>) => {
     const id = `d${Date.now()}`;
-    await setDoc(doc(db, 'departments', id), { ...deptData, id });
+    const newDept = { ...deptData, id };
+    setDepartments(prev => [...prev, newDept]);
   };
 
   const updateDepartment = async (id: string, deptData: Partial<Department>) => {
-    await setDoc(doc(db, 'departments', id), deptData, { merge: true });
+    setDepartments(prev => prev.map(d => d.id === id ? { ...d, ...deptData } : d));
   };
 
   const deleteDepartment = async (id: string) => {
-    await deleteDoc(doc(db, 'departments', id));
+    setDepartments(prev => prev.filter(d => d.id !== id));
   };
 
   const saveAttendance = async (date: string, department: string, records: AttendanceRecord[]) => {
-    const batch = writeBatch(db);
-    
-    // In a real app, we'd query and delete existing records for this date/dept/serviceType
-    // For simplicity in this demo, we'll just add the new ones.
-    // Ideally, we'd use a unique ID like `${date}_${department}_${serviceType}_${memberId}`
-    
-    records.forEach(record => {
-      const id = record.id || `a${Date.now()}_${record.memberId}`;
-      batch.set(doc(db, 'attendance', id), { ...record, id });
+    await apiFetch('/api/attendance/batch', {
+      method: 'POST',
+      body: JSON.stringify({ records })
     });
-
-    await batch.commit();
+    // Refresh local attendance
+    const attendanceRes = await apiFetch('/api/attendance');
+    setAttendance(attendanceRes);
   };
 
   const addMeeting = async (meetingData: Omit<Meeting, 'id'>) => {
     const id = `mt${Date.now()}`;
-    await setDoc(doc(db, 'meetings', id), { ...meetingData, id });
+    const newMeeting = { ...meetingData, id };
+    setMeetings(prev => [...prev, newMeeting]);
     toast.success('Reunião agendada com sucesso!');
   };
 
   const deleteMeeting = async (id: string) => {
-    await deleteDoc(doc(db, 'meetings', id));
+    setMeetings(prev => prev.filter(m => m.id !== id));
   };
 
   const updateSettings = async (settingsData: Partial<AppSettings>) => {
-    await setDoc(doc(db, 'settings', 'global'), settingsData, { merge: true });
+    await apiFetch('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settingsData)
+    });
+    setSettings(prev => prev ? { ...prev, ...settingsData } : (settingsData as AppSettings));
   };
 
   const resetData = async () => {
-    const collections = ['members', 'users', 'departments', 'attendance', 'meetings', 'settings'];
-    for (const collName of collections) {
-      const snapshot = await getDocs(collection(db, collName));
-      const batch = writeBatch(db);
-      snapshot.docs.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-    }
-    toast.success('Todos os dados foram resetados!');
-    window.location.reload();
+    toast.error('Reset de dados não disponível em modo SQL via interface.');
   };
 
   return (

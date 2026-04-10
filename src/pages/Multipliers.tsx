@@ -89,7 +89,7 @@ export function Multipliers() {
     <div className="space-y-10 pb-20">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-display font-bold text-slate-900 tracking-tight">Multiplicadores & Auxiliares</h2>
+          <h2 className="text-4xl font-black text-slate-900 tracking-tight">Multiplicadores</h2>
           <p className="text-slate-500 mt-1">
             {currentUser?.role === 'pastor' 
               ? 'Acompanhe todos os multiplicadores da igreja.' 

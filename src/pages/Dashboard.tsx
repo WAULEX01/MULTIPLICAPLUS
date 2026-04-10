@@ -303,78 +303,94 @@ export function Dashboard() {
         ))}
       </div>
 
-      {/* Radar Inteligente */}
-      <div className="space-y-6">
+      {/* Radar Inteligente - HIGHLIGHTED */}
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.4 }}
+        className="space-y-6 relative"
+      >
+        {/* Decorative background glow */}
+        <div className="absolute -inset-4 bg-rose-500/5 blur-3xl rounded-[4rem] -z-10" />
+        
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center text-white shadow-lg">
-              <AlertTriangle className="w-6 h-6" />
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-rose-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-rose-500/20 animate-pulse">
+              <AlertTriangle className="w-8 h-8" />
             </div>
-            <h3 className="text-xl font-display font-bold text-slate-900">Radar Inteligente dos Faltosos</h3>
+            <div>
+              <h3 className="text-2xl font-display font-bold text-slate-900 tracking-tight">Radar Inteligente</h3>
+              <p className="text-slate-500 text-sm font-medium">Ação imediata para retenção de membros</p>
+            </div>
           </div>
-          <span className="px-4 py-1.5 bg-rose-50 text-rose-600 rounded-full text-xs font-bold border border-rose-100">
-            {radarData.length} Alertas Ativos
-          </span>
+          <div className="flex flex-col items-end">
+            <span className="px-4 py-1.5 bg-rose-50 text-rose-600 rounded-full text-xs font-black border border-rose-100 shadow-sm">
+              {radarData.length} ALERTAS CRÍTICOS
+            </span>
+          </div>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-[3rem] border-2 border-rose-100 shadow-xl shadow-rose-500/5 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/50">
-                  <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Membro</th>
-                  <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Departamento</th>
-                  <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Faltas</th>
-                  <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Ação Recomendada</th>
+                <tr className="bg-rose-50/30">
+                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-rose-400">Membro em Alerta</th>
+                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-rose-400">Departamento</th>
+                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-rose-400">Tempo de Ausência</th>
+                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-rose-400 text-right">Ação Prioritária</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-rose-50">
                 {radarData.slice(0, 5).map((m, i) => (
-                  <tr key={m.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
+                  <tr key={m.id} className="hover:bg-rose-50/20 transition-colors group">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-4">
                         <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-sm",
+                          "w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-md",
                           m.alertColor
                         )}>
                           {m.name.charAt(0)}
                         </div>
-                        <span className="font-bold text-slate-700">{m.name}</span>
+                        <div>
+                          <span className="font-black text-slate-800 block">{m.name}</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">ID: {m.id}</span>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-8 py-5">
-                      <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">
+                    <td className="px-8 py-6">
+                      <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-wider">
                         {m.department}
                       </span>
                     </td>
-                    <td className="px-8 py-5">
+                    <td className="px-8 py-6">
                       <div className="flex items-center gap-2">
                         <div className={cn(
-                          "w-2 h-2 rounded-full",
+                          "w-2.5 h-2.5 rounded-full animate-ping",
                           m.alertColor
                         )} />
-                        <span className="font-bold text-slate-900">{m.absences} semanas</span>
+                        <span className="font-black text-slate-900">{m.absences} {m.absences === 1 ? 'semana' : 'semanas'}</span>
                       </div>
                     </td>
-                    <td className="px-8 py-5 text-right">
-                      <div className={cn(
-                        "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all group-hover:scale-105",
+                    <td className="px-8 py-6 text-right">
+                      <button className={cn(
+                        "inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black border-2 transition-all hover:scale-105 active:scale-95 shadow-sm",
                         m.color
                       )}>
                         {m.icon && React.createElement(m.icon as any, { className: "w-4 h-4" })}
-                        {m.action}
-                      </div>
+                        {m.action.toUpperCase()}
+                      </button>
                     </td>
                   </tr>
                 ))}
                 {radarData.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-8 py-20 text-center">
-                      <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                    <td colSpan={4} className="px-8 py-24 text-center">
+                      <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                        <CheckCircle2 className="w-10 h-10 text-emerald-500" />
                       </div>
-                      <p className="text-slate-500 font-bold">Nenhum alerta no momento!</p>
-                      <p className="text-slate-400 text-sm">Todos os membros estão frequentes.</p>
+                      <h4 className="text-xl font-display font-bold text-slate-900">Céu Limpo!</h4>
+                      <p className="text-slate-400 font-medium mt-1">Nenhum membro em situação de alerta no momento.</p>
                     </td>
                   </tr>
                 )}
@@ -382,14 +398,14 @@ export function Dashboard() {
             </table>
           </div>
           {radarData.length > 5 && (
-            <div className="p-6 bg-slate-50/50 border-t border-slate-50 text-center">
-              <button className="text-primary-start font-black text-xs uppercase tracking-widest hover:underline">
-                Ver todos os {radarData.length} alertas
+            <div className="p-6 bg-rose-50/30 border-t border-rose-100 text-center">
+              <button className="text-rose-600 font-black text-xs uppercase tracking-widest hover:underline flex items-center gap-2 mx-auto">
+                Ver todos os {radarData.length} alertas do radar <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Chart Section */}

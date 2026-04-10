@@ -18,6 +18,7 @@ import { Meetings } from './pages/Meetings';
 import { Departments } from './pages/Departments';
 import { Leaders } from './pages/Leaders';
 import { Login } from './pages/Login';
+import { Register } from './pages/Register';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -29,6 +30,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/" element={
               <ProtectedRoute>
                 <Layout />

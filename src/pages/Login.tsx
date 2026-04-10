@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
 import { toast } from 'sonner';
@@ -21,7 +21,7 @@ export function Login() {
     const roleNames = {
       pastor: 'Pastor',
       lider: 'Líder',
-      multiplicador: 'Auxiliar'
+      multiplicador: 'Multiplicador'
     };
     toast.success(`Entrando como ${roleNames[role]} (Teste)...`);
     navigate('/');
@@ -141,7 +141,7 @@ export function Login() {
                   className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-orange-50 text-orange-600 hover:bg-orange-100 transition-all disabled:opacity-50"
                 >
                   <Zap className="w-5 h-5" />
-                  <span className="text-[10px] font-bold uppercase">Auxiliar</span>
+                  <span className="text-[10px] font-bold uppercase">Multiplicador</span>
                 </button>
               </div>
             </div>
@@ -151,6 +151,10 @@ export function Login() {
         </div>
 
         <p className="text-center text-slate-400 text-sm mt-8">
+          Não tem uma conta? <Link to="/register" className="text-primary-start font-bold hover:underline">Cadastre-se</Link>
+        </p>
+
+        <p className="text-center text-slate-400 text-sm mt-4">
           Esqueceu sua senha? Entre em contato com o suporte.
         </p>
       </motion.div>
